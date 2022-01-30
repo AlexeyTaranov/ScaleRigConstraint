@@ -1,0 +1,15 @@
+{
+  "name": "com.alexeytaranov.scalablerig",
+  "version": "0.0.1",
+  "displayName": "Scalable Rig",
+  "description": "Scalable Rig for Animation Rigging",
+  "unity": "2020.1",
+  "unityRelease": "0b1",
+  "dependencies": {
+    "com.unity.animation.rigging": "1.0.0"
+  },
+  "author": {
+    "name": "Alexey Taranov",
+    "email": "alexey.taranov0@gmail.com"
+  }
+}
