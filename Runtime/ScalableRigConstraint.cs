@@ -9,22 +9,12 @@ namespace ScalableRig
         ScalableRigConstraintJobData,
         ScalableRigConstraintBinder>
     {
-        private void OnValidate()
-        {
-            if (m_Data.Data.Length > 8)
-            {
-                Debug.LogError($"[{nameof(ScalableRigConstraint)}] Support blend only maximum 8 bones");
-                var arrayWithLimit = new TransferTransformOffsetLocalScale[8];
-                Array.Copy(m_Data.Data, arrayWithLimit, 8);
-                m_Data.Data = arrayWithLimit;
-            }
-        }
     }
 
     [Serializable]
     public struct ScalableRigConstraintJobData : IAnimationJobData
     {
-        public TransferTransformOffsetLocalScale[] Data;
+        public TransferTransform[] TransferData;
 
         public bool IsValid() => true;
 
@@ -34,9 +24,9 @@ namespace ScalableRig
     }
 
     [Serializable]
-    public struct TransferTransformOffsetLocalScale
+    public struct TransferTransform
     {
-        public Transform ToWrite;
-        public Transform FromRead;
+        public Transform Read;
+        public Transform Write;
     }
 }
