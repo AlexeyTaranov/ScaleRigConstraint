@@ -14,7 +14,7 @@ namespace ScalableRig
     [Serializable]
     public struct ScalableRigConstraintJobData : IAnimationJobData
     {
-        public WeightedTransformArray ReadData;
+        [SyncSceneToStream] public WeightedTransformArray ReadData;
         public WeightedTransformArray WriteData;
 
         public bool IsValid() => true;
