@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using ScalableRig;
+using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
@@ -17,6 +19,35 @@ public class ScalableRigConstraintEditor : Editor
         Default,
         ModifySkeletonToApply,
         Preview
+    }
+
+    public void OnEnable()
+    {
+        AssemblyReloadEvents.beforeAssemblyReload += DeleteModifiedSettingsAndSetDefaultState;
+    }
+
+    public void OnDisable()
+    {
+        AssemblyReloadEvents.beforeAssemblyReload -= DeleteModifiedSettingsAndSetDefaultState;
+    }
+
+    private void DeleteModifiedSettingsAndSetDefaultState()
+    {
+        _state = State.Default;
+        RestoreLocalTranslations();
+        _localDefaultPositions.Clear();
+    }
+
+    private void RestoreLocalTranslations()
+    {
+        foreach (var tuple in _localDefaultPositions)
+        {
+            var inputT = tuple.Key;
+            var (pos, scale, rot) = tuple.Value;
+            inputT.localPosition = pos;
+            inputT.localScale = scale;
+            inputT.localRotation = rot;
+        }
     }
 
     public override void OnInspectorGUI()
@@ -45,6 +76,7 @@ public class ScalableRigConstraintEditor : Editor
                 }
                 break;
             case State.ModifySkeletonToApply:
+                DrawLabelWithModifiedObjectsCount();
                 if (GUILayout.Button("Apply"))
                 {
                     var offsets = GetOffsetsFromDefaultPositions();
@@ -81,19 +113,45 @@ public class ScalableRigConstraintEditor : Editor
             return modifiedLocalTranslations;
         }
 
-        void RestoreLocalTranslations()
+        void DrawLabelWithModifiedObjectsCount()
         {
+            var changed = GetModifiedObjectsCount();
+            var max = WeightedTransformArray.k_MaxLength;
+            var textLabel = $"Changed objects: {changed}, max: {max}.";
+            if (changed > max)
+            {
+                textLabel += " Will be saved only first 8 changes.";
+                var errorStyle = new GUIStyle()
+                    { fontStyle = FontStyle.Bold, normal = new GUIStyleState() { textColor = Color.red } };
+                GUILayout.Label(textLabel, errorStyle);
+            }
+            else
+            {
+                GUILayout.Label(textLabel);
+            }
+        }
+
+        int GetModifiedObjectsCount()
+        {
+            int count = 0;
             foreach (var tuple in _localDefaultPositions)
             {
                 var inputT = tuple.Key;
                 var (pos, scale, rot) = tuple.Value;
-                inputT.localPosition = pos;
-                inputT.localScale = scale;
-                inputT.localRotation = rot;
+                const float minOffset = 0.1f;
+                bool isChangedValues = Vector3.Distance(pos, inputT.localPosition) > minOffset ||
+                                       Vector3.Distance(scale, inputT.localScale) > minOffset;
+                if (isChangedValues)
+                {
+                    count++;
+                }
             }
+
+            return count;
         }
 
-        void GenerateNewGosWithOffsetsAndApplyToConstraints(List<(Transform target, Vector3 pos, Vector3 scale)> localOffsets)
+        void GenerateNewGosWithOffsetsAndApplyToConstraints(
+            List<(Transform target, Vector3 pos, Vector3 scale)> localOffsets)
         {
             for (int i = constraint.transform.childCount - 1; i >= 0; i--)
             {
@@ -117,8 +175,8 @@ public class ScalableRigConstraintEditor : Editor
                 newTarget.transform.SetParent(newParent.transform);
                 newTarget.transform.localScale = localScale;
                 newTarget.transform.localPosition = localPos;
-                read.Add(new WeightedTransform(newTarget.transform,1));
-                write.Add(new WeightedTransform(transform,0));
+                read.Add(new WeightedTransform(newTarget.transform, 1));
+                write.Add(new WeightedTransform(transform, 0));
             }
 
             constraint.data.ReadData = read;
