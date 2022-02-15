@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using ScalableRig;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Animations.Rigging;
 
 [CustomEditor(typeof(ScalableRigConstraint))]
 public class ScalableRigConstraintEditor : Editor
@@ -92,16 +93,21 @@ public class ScalableRigConstraintEditor : Editor
             }
         }
 
-        void GenerateNewGosWithOffsetsAndApplyToConstraints(IEnumerable<(Transform target, Vector3 pos, Vector3 scale)> localOffsets)
+        void GenerateNewGosWithOffsetsAndApplyToConstraints(List<(Transform target, Vector3 pos, Vector3 scale)> localOffsets)
         {
-            var constraintData = new List<TransferTransform>();
             for (int i = constraint.transform.childCount - 1; i >= 0; i--)
             {
                 var child = constraint.transform.GetChild(i);
                 DestroyImmediate(child.gameObject);
             }
-            foreach (var (transform, localPos, localScale) in localOffsets)
+
+            var read = new WeightedTransformArray();
+            var write = new WeightedTransformArray();
+            var max = Mathf.Min(8, localOffsets.Count);
+            for (int i = 0; i < max; i++)
             {
+                var (transform, localPos, localScale) = localOffsets[i];
+
                 var newParent = new GameObject($"{transform.name}_Parent");
                 newParent.transform.position = transform.position;
                 newParent.transform.SetParent(constraint.transform, true);
@@ -111,23 +117,22 @@ public class ScalableRigConstraintEditor : Editor
                 newTarget.transform.SetParent(newParent.transform);
                 newTarget.transform.localScale = localScale;
                 newTarget.transform.localPosition = localPos;
-                constraintData.Add(new TransferTransform()
-                {
-                    Read = newTarget.transform,
-                    Write = transform
-                });
+                read.Add(new WeightedTransform(newTarget.transform,1));
+                write.Add(new WeightedTransform(transform,0));
             }
-            constraint.data.TransferData = constraintData.ToArray();
+
+            constraint.data.ReadData = read;
+            constraint.data.WriteData = write;
         }
 
         void ApplyPreview()
         {
-            foreach (var transferTransform in constraint.data.TransferData)
+            for (int i = 0; i < constraint.data.ReadData.Count; i++)
             {
-                var read = transferTransform.Read;
-                var write = transferTransform.Write;
-                write.localPosition = read.localPosition;
-                write.localScale = read.localScale;
+                var read = constraint.data.ReadData[i];
+                var write = constraint.data.WriteData[i];
+                write.transform.localPosition = read.transform.localPosition;
+                write.transform.localScale = read.transform.localScale;
             }
         }
 
