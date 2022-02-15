@@ -59,7 +59,7 @@ namespace ScalableRig
             WeightedTransformArrayBinder.BindReadWriteTransforms(animator, component, data.WriteData,
                 out var writeTransforms);
             WeightedTransformArrayBinder.BindWeights(animator, component, data.ReadData,
-                PropertyUtils.ConstructConstraintDataPropertyName(nameof(ScalableRigConstraintJobData.ReadData)),
+                ConstraintsUtils.ConstructConstraintDataPropertyName(nameof(ScalableRigConstraintJobData.ReadData)),
                 out var readWeights);
             var defaultLocalScales = new NativeArray<Vector3>(data.WriteData.Count, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
@@ -78,7 +78,7 @@ namespace ScalableRig
                 write = writeTransforms,
                 readWeightHandles = readWeights,
                 weightBuffers = new NativeArray<float>(data.ReadData.Count,Allocator.Persistent,NativeArrayOptions.UninitializedMemory),
-                jobWeight = FloatProperty.Bind(animator, component, ConstraintProperties.s_Weight),
+                jobWeight = FloatProperty.Bind(animator, component, ScalableRigConstraint.WeightPropertyName),
                 defaultLocalPositions = defaultLocalPositions,
                 defaultLocalScales = defaultLocalScales
             };

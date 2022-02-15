@@ -9,12 +9,13 @@ namespace ScalableRig
         ScalableRigConstraintJobData,
         ScalableRigConstraintBinder>
     {
+        internal static string WeightPropertyName => nameof(m_Weight);
     }
 
     [Serializable]
     public struct ScalableRigConstraintJobData : IAnimationJobData
     {
-        [SyncSceneToStream] public WeightedTransformArray ReadData;
+        [SyncSceneToStream,Range(0, 1)] public WeightedTransformArray ReadData;
         public WeightedTransformArray WriteData;
 
         public bool IsValid() => true;

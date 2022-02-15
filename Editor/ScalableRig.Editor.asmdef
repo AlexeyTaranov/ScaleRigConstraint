@@ -1,9 +1,9 @@
 {
     "name": "ScalableRig.Editor",
-    "rootNamespace": "",
     "references": [
         "GUID:b90ce523341911e419923d56e05b5b19",
-        "GUID:7f7d1af65c2641843945d409d28f2e20"
+        "GUID:7f7d1af65c2641843945d409d28f2e20",
+        "GUID:af4a3ceb227b8f94cb8375f40e156398"
     ],
     "includePlatforms": [
         "Editor"
