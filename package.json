@@ -11,5 +11,11 @@
   "author": {
     "name": "Alexey Taranov",
     "email": "alexey.taranov0@gmail.com"
-  }
+  },
+  "samples": [
+    {
+      "displayName": "Scalable Ninja",
+      "path": "Samples~/Scalable Ninja"
+    }
+  ]
 }
