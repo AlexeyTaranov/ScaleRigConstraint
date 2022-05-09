@@ -16,7 +16,7 @@ namespace ScalableRig
     public struct ScalableRigConstraintJobData : IAnimationJobData
     {
         public ScalePosition[] ScaleData;
-        [SyncSceneToStream,Range(0, 1)]  public WeightedTransformArray Bones;
+        [SyncSceneToStream, Range(0, 1)] public WeightedTransformArray Bones;
 
         public bool IsValid() => true;
 

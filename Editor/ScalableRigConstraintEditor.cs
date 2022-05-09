@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEditor.Animations.Rigging;
@@ -11,59 +13,33 @@ namespace ScalableRig
     [CustomEditor(typeof(ScalableRigConstraint))]
     public class ScalableRigConstraintEditor : Editor
     {
-        private State _state = State.Default;
-
+        const float MinOffset = 0.1f;
         private SerializedProperty _weightProperty;
         private ReorderableList _reorderableList;
         private ScalableRigConstraint _constraint;
 
-        private Dictionary<Transform, (Vector3 pos, Vector3 scale, Quaternion rot)> _localDefaultPositions =
-            new Dictionary<Transform, (Vector3 pos, Vector3 scale, Quaternion rot)>();
+        private Func<bool> _isCompleteModification;
 
-        private enum State
+        private struct TransformValue
         {
-            Default,
-            ModifySkeletonToApply,
-            Preview
+            public Vector3 Position;
+            public Vector3 Scale;
+            public Quaternion Rotation;
         }
 
         public void OnEnable()
         {
-            AssemblyReloadEvents.beforeAssemblyReload += DeleteModifiedSettingsAndSetDefaultState;
             _weightProperty = serializedObject.FindProperty("m_Weight");
             _constraint = (ScalableRigConstraint)serializedObject.targetObject;
             var data = serializedObject.FindProperty("m_Data");
             var readData = data.FindPropertyRelative(nameof(ScalableRigConstraint.data.Bones));
             var readFieldInfo = _constraint.data.GetType().GetField(nameof(ScalableRigConstraint.data.Bones));
             var range = readFieldInfo.GetCustomAttribute<RangeAttribute>();
-            _reorderableList = WeightedTransformHelper.CreateReorderableList(readData, ref _constraint.data.Bones, range);
+            _reorderableList =
+                WeightedTransformHelper.CreateReorderableList(readData, ref _constraint.data.Bones, range);
             _reorderableList.displayAdd = false;
             _reorderableList.displayRemove = false;
             _reorderableList.draggable = false;
-        }
-
-        public void OnDisable()
-        {
-            AssemblyReloadEvents.beforeAssemblyReload -= DeleteModifiedSettingsAndSetDefaultState;
-        }
-
-        private void DeleteModifiedSettingsAndSetDefaultState()
-        {
-            _state = State.Default;
-            RestoreLocalTranslations();
-            _localDefaultPositions.Clear();
-        }
-
-        private void RestoreLocalTranslations()
-        {
-            foreach (var tuple in _localDefaultPositions)
-            {
-                var inputT = tuple.Key;
-                var (pos, scale, rot) = tuple.Value;
-                inputT.localPosition = pos;
-                inputT.localScale = scale;
-                inputT.localRotation = rot;
-            }
         }
 
         public override void OnInspectorGUI()
@@ -84,147 +60,167 @@ namespace ScalableRig
                 return;
             }
 
-            var constraint = target as ScalableRigConstraint;
-            switch (_state)
+            if (_isCompleteModification?.Invoke() == true)
             {
-                case State.Default:
-                    if (GUILayout.Button("Start Modify"))
-                    {
-                        SaveDefaultRigParams();
-                        _state = State.ModifySkeletonToApply;
-                    }
-
-                    if (GUILayout.Button("Preview"))
-                    {
-                        SaveDefaultRigParams();
-                        ApplyPreview();
-                        _state = State.Preview;
-                    }
-
-                    break;
-                case State.ModifySkeletonToApply:
-                    DrawLabelWithModifiedObjectsCount();
-                    if (GUILayout.Button("Apply"))
-                    {
-                        var offsets = GetOffsetsFromDefaultPositions();
-                        RestoreLocalTranslations();
-                        GenerateNewGosWithOffsetsAndApplyToConstraint(offsets);
-                        _state = State.Default;
-                    }
-
-                    break;
-                case State.Preview:
-                    if (GUILayout.Button("Stop Preview"))
-                    {
-                        RestoreLocalTranslations();
-                        _state = State.Default;
-                    }
-
-                    break;
+                _isCompleteModification = null;
             }
 
-            List<(Transform target, Vector3 pos, Vector3 scale)> GetOffsetsFromDefaultPositions()
+            if (_isCompleteModification == null)
             {
-                var modifiedLocalTranslations = new List<(Transform target, Vector3 pos, Vector3 scale)>();
-                foreach (var tuple in _localDefaultPositions)
+                if (GUILayout.Button("Start Modify"))
                 {
-                    var inputT = tuple.Key;
-                    var (pos, scale, rot) = tuple.Value;
-                    const float minOffset = 0.1f;
-                    bool isChangedValues = Vector3.Distance(pos, inputT.localPosition) > minOffset ||
-                                           Vector3.Distance(scale, inputT.localScale) > minOffset;
-                    if (isChangedValues)
-                    {
-                        modifiedLocalTranslations.Add((inputT, pos, inputT.localScale));
-                    }
+                    _isCompleteModification = GenerateNewConstraintData();
                 }
 
-                return modifiedLocalTranslations;
-            }
-
-            void DrawLabelWithModifiedObjectsCount()
-            {
-                var changed = GetModifiedObjectsCount();
-                var max = WeightedTransformArray.k_MaxLength;
-                var textLabel = $"Changed objects: {changed}, max: {max}.";
-                if (changed > max)
+                if (GUILayout.Button("Preview"))
                 {
-                    textLabel += " Will be saved only first 8 changes.";
-                    var errorStyle = new GUIStyle()
-                        { fontStyle = FontStyle.Bold, normal = new GUIStyleState() { textColor = Color.red } };
-                    GUILayout.Label(textLabel, errorStyle);
-                }
-                else
-                {
-                    GUILayout.Label(textLabel);
+                    _isCompleteModification = ShowPreview();
                 }
             }
+        }
 
-            int GetModifiedObjectsCount()
+        Dictionary<Transform, TransformValue> GetDefaultTransformValues()
+        {
+            var defaultPositions = new Dictionary<Transform, TransformValue>();
+            var animator = _constraint.transform.GetComponentInParent<Animator>();
+            if (animator == null)
             {
-                int count = 0;
-                foreach (var tuple in _localDefaultPositions)
-                {
-                    var inputT = tuple.Key;
-                    var (pos, scale, rot) = tuple.Value;
-                    const float minOffset = 0.1f;
-                    bool isChangedValues = Vector3.Distance(pos, inputT.localPosition) > minOffset ||
-                                           Vector3.Distance(scale, inputT.localScale) > minOffset;
-                    if (isChangedValues)
-                    {
-                        count++;
-                    }
-                }
-
-                return count;
+                Debug.LogError(
+                    $"[{nameof(ScalableRigConstraint)}] Can't find animator in parent for constraint: {_constraint.name}",
+                    _constraint);
+                return defaultPositions;
             }
 
-            void GenerateNewGosWithOffsetsAndApplyToConstraint(
-                List<(Transform target, Vector3 pos, Vector3 scale)> localOffsets)
+            var bones = animator.GetComponentsInChildren<Transform>();
+            foreach (var bone in bones)
             {
-                var bones = new WeightedTransformArray();
-                var max = Mathf.Min(8, localOffsets.Count);
-                var custom = new ScalePosition[max];
-                for (int i = 0; i < max; i++)
+                defaultPositions.Add(bone, new TransformValue
                 {
-                    var (transform, localPos, localScale) = localOffsets[i];
-                    custom[i] = new ScalePosition(localScale, localPos);
-                    bones.Add(new WeightedTransform(transform, 1));
-                }
-
-                constraint.data.Bones = bones;
-                constraint.data.ScaleData = custom;
+                    Position = bone.localPosition,
+                    Scale = bone.localScale,
+                    Rotation = bone.localRotation
+                });
             }
 
-            void ApplyPreview()
+            return defaultPositions;
+        }
+
+        private Func<bool> GenerateNewConstraintData()
+        {
+            var defaultTransforms = GetDefaultTransformValues();
+            return DrawUI;
+
+            bool DrawUI()
             {
-                var bones = constraint.data.Bones;
-                var customData = constraint.data.ScaleData;
-                for (int i = 0; i < bones.Count; i++)
+                DrawLabelWithModifiedObjectsCount(defaultTransforms);
+                if (GUILayout.Button("Apply"))
                 {
-                    var bone = constraint.data.Bones[i];
-                    bone.transform.localPosition = customData[i].Position;
-                    bone.transform.localScale = customData[i].Scale;
+                    var modifiedTransforms = defaultTransforms.Where(pair => IsUpdatedTransform(pair.Value, pair.Key))
+                        .Select(pair => pair.Key).ToArray();
+                    ApplyNewConstraintData(modifiedTransforms);
+                    RestoreLocalTranslations(ref defaultTransforms);
+                    serializedObject.ApplyModifiedProperties();
+                    return true;
+                }
+
+                if (GUILayout.Button("Cancel"))
+                {
+                    RestoreLocalTranslations(ref defaultTransforms);
+                    return true;
+                }
+
+                return false;
+            }
+        }
+
+        private Func<bool> ShowPreview()
+        {
+            var defaultTransforms = GetDefaultTransformValues();
+            ApplyPreview();
+            return DrawUI;
+
+            bool DrawUI()
+            {
+                if (GUILayout.Button("Cancel"))
+                {
+                    RestoreLocalTranslations(ref defaultTransforms);
+                    return true;
+                }
+
+                return false;
+            }
+        }
+
+        void DrawLabelWithModifiedObjectsCount(in Dictionary<Transform, TransformValue> defaultValues)
+        {
+            var modifiedObjects = GetModifiedObjects(defaultValues);
+            var modifiedObjectsCount = modifiedObjects.Count();
+            var max = WeightedTransformArray.k_MaxLength;
+            var textLabel = $"Changed objects: {modifiedObjectsCount}, max: {max}.";
+            if (modifiedObjectsCount > max)
+            {
+                textLabel += " Will be saved only first 8 changes.";
+                var errorStyle = new GUIStyle()
+                    { fontStyle = FontStyle.Bold, normal = new GUIStyleState() { textColor = Color.red } };
+                GUILayout.Label(textLabel, errorStyle);
+            }
+            else
+            {
+                GUILayout.Label(textLabel);
+                foreach (var modifiedObject in modifiedObjects)
+                {
+                    GUILayout.Label($"Modified object: {modifiedObject.name}");
                 }
             }
+        }
 
-            void SaveDefaultRigParams()
+        IEnumerable<Transform> GetModifiedObjects(in Dictionary<Transform, TransformValue> defaultValues)
+        {
+            return defaultValues.Where(pair => IsUpdatedTransform(pair.Value, pair.Key)).Select((pair => pair.Key));
+        }
+
+        bool IsUpdatedTransform(TransformValue defaultValue, Transform transform)
+        {
+            bool isChangedValues = Vector3.Distance(defaultValue.Position, transform.localPosition) > MinOffset ||
+                                   Vector3.Distance(defaultValue.Scale, transform.localScale) > MinOffset;
+            return isChangedValues;
+        }
+
+        private void RestoreLocalTranslations(ref Dictionary<Transform, TransformValue> defaultValues)
+        {
+            foreach (var tuple in defaultValues)
             {
-                _localDefaultPositions.Clear();
-                var animator = constraint.transform.GetComponentInParent<Animator>();
-                if (animator == null)
-                {
-                    Debug.LogError(
-                        $"[{nameof(ScalableRigConstraint)}] Can't find animator in parent for constraint: {constraint.name}",
-                        constraint);
-                    return;
-                }
+                var inputT = tuple.Key;
+                inputT.localPosition = tuple.Value.Position;
+                inputT.localScale = tuple.Value.Scale;
+                inputT.localRotation = tuple.Value.Rotation;
+            }
+        }
 
-                var bones = animator.GetComponentsInChildren<Transform>();
-                foreach (var bone in bones)
-                {
-                    _localDefaultPositions.Add(bone, (bone.localPosition, bone.localScale, bone.localRotation));
-                }
+        void ApplyNewConstraintData(Transform[] modifiedObjects)
+        {
+            var bones = new WeightedTransformArray();
+            var max = Mathf.Min(8, modifiedObjects.Length);
+            var custom = new ScalePosition[max];
+            for (int i = 0; i < max; i++)
+            {
+                custom[i] = new ScalePosition(modifiedObjects[i].localScale, modifiedObjects[i].localPosition);
+                bones.Add(new WeightedTransform(modifiedObjects[i], 1));
+            }
+
+            _constraint.data.Bones = bones;
+            _constraint.data.ScaleData = custom;
+        }
+
+        void ApplyPreview()
+        {
+            var bones = _constraint.data.Bones;
+            var customData = _constraint.data.ScaleData;
+            for (int i = 0; i < bones.Count; i++)
+            {
+                var bone = _constraint.data.Bones[i];
+                bone.transform.localPosition = customData[i].Position;
+                bone.transform.localScale = customData[i].Scale;
             }
         }
     }

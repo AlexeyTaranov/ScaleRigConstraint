@@ -78,7 +78,8 @@ namespace ScalableRig
                 bones = boneTransforms,
                 readWeightHandles = readWeights,
                 scalePositions = customScalesAndPositions,
-                weightBuffers = new NativeArray<float>(data.Bones.Count,Allocator.Persistent,NativeArrayOptions.UninitializedMemory),
+                weightBuffers = new NativeArray<float>(data.Bones.Count, Allocator.Persistent,
+                    NativeArrayOptions.UninitializedMemory),
                 jobWeight = FloatProperty.Bind(animator, component, ScalableRigConstraint.WeightPropertyName),
                 defaultLocalPositions = defaultLocalPositions,
                 defaultLocalScales = defaultLocalScales
