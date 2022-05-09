@@ -2,18 +2,18 @@
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
 
-namespace ScalableRig
+namespace ScaleConstraintAnimation
 {
-    public class ScalableRigConstraint : RigConstraint<
-        ScalableRigConstraintJob,
-        ScalableRigConstraintJobData,
+    public class ScaleConstraint : RigConstraint<
+        ScaleConstraintJob,
+        ScaleConstraintJobData,
         ScalableRigConstraintBinder>
     {
         internal static string WeightPropertyName => nameof(m_Weight);
     }
 
     [Serializable]
-    public struct ScalableRigConstraintJobData : IAnimationJobData
+    public struct ScaleConstraintJobData : IAnimationJobData
     {
         public ScalePosition[] ScaleData;
         [SyncSceneToStream, Range(0, 1)] public WeightedTransformArray Bones;

@@ -8,15 +8,15 @@ using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
 
-namespace ScalableRig
+namespace ScaleConstraintAnimation
 {
-    [CustomEditor(typeof(ScalableRigConstraint))]
-    public class ScalableRigConstraintEditor : Editor
+    [CustomEditor(typeof(ScaleConstraint))]
+    public class ScaleConstraintEditor : Editor
     {
         const float MinOffset = 0.1f;
         private SerializedProperty _weightProperty;
         private ReorderableList _reorderableList;
-        private ScalableRigConstraint _constraint;
+        private ScaleConstraint _constraint;
 
         private Func<bool> _isCompleteModification;
 
@@ -30,10 +30,10 @@ namespace ScalableRig
         public void OnEnable()
         {
             _weightProperty = serializedObject.FindProperty("m_Weight");
-            _constraint = (ScalableRigConstraint)serializedObject.targetObject;
+            _constraint = (ScaleConstraint)serializedObject.targetObject;
             var data = serializedObject.FindProperty("m_Data");
-            var readData = data.FindPropertyRelative(nameof(ScalableRigConstraint.data.Bones));
-            var readFieldInfo = _constraint.data.GetType().GetField(nameof(ScalableRigConstraint.data.Bones));
+            var readData = data.FindPropertyRelative(nameof(ScaleConstraint.data.Bones));
+            var readFieldInfo = _constraint.data.GetType().GetField(nameof(ScaleConstraint.data.Bones));
             var range = readFieldInfo.GetCustomAttribute<RangeAttribute>();
             _reorderableList =
                 WeightedTransformHelper.CreateReorderableList(readData, ref _constraint.data.Bones, range);
@@ -86,7 +86,7 @@ namespace ScalableRig
             if (animator == null)
             {
                 Debug.LogError(
-                    $"[{nameof(ScalableRigConstraint)}] Can't find animator in parent for constraint: {_constraint.name}",
+                    $"[{nameof(ScaleConstraint)}] Can't find animator in parent for constraint: {_constraint.name}",
                     _constraint);
                 return defaultPositions;
             }
