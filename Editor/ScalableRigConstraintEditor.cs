@@ -13,7 +13,7 @@ namespace ScalableRig
     {
         private State _state = State.Default;
 
-        private SerializedProperty m_Weight;
+        private SerializedProperty _weightProperty;
         private ReorderableList _reorderableList;
         private ScalableRigConstraint _constraint;
 
@@ -30,14 +30,13 @@ namespace ScalableRig
         public void OnEnable()
         {
             AssemblyReloadEvents.beforeAssemblyReload += DeleteModifiedSettingsAndSetDefaultState;
-            m_Weight = serializedObject.FindProperty("m_Weight");
+            _weightProperty = serializedObject.FindProperty("m_Weight");
             _constraint = (ScalableRigConstraint)serializedObject.targetObject;
             var data = serializedObject.FindProperty("m_Data");
-            var readData = data.FindPropertyRelative(nameof(ScalableRigConstraint.data.ReadData));
-            var readFieldInfo = _constraint.data.GetType().GetField(nameof(ScalableRigConstraint.data.ReadData));
+            var readData = data.FindPropertyRelative(nameof(ScalableRigConstraint.data.Bones));
+            var readFieldInfo = _constraint.data.GetType().GetField(nameof(ScalableRigConstraint.data.Bones));
             var range = readFieldInfo.GetCustomAttribute<RangeAttribute>();
-            _reorderableList =
-                WeightedTransformHelper.CreateReorderableList(readData, ref _constraint.data.ReadData, range);
+            _reorderableList = WeightedTransformHelper.CreateReorderableList(readData, ref _constraint.data.Bones, range);
             _reorderableList.displayAdd = false;
             _reorderableList.displayRemove = false;
             _reorderableList.draggable = false;
@@ -70,9 +69,9 @@ namespace ScalableRig
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
-            EditorGUILayout.PropertyField(m_Weight);
+            EditorGUILayout.PropertyField(_weightProperty);
             _reorderableList.DoLayoutList();
-            _reorderableList.list = _constraint.data.ReadData;
+            _reorderableList.list = _constraint.data.Bones;
             DrawButtonsAndExecuteModifications();
             serializedObject.ApplyModifiedProperties();
         }
@@ -100,13 +99,6 @@ namespace ScalableRig
                         SaveDefaultRigParams();
                         ApplyPreview();
                         _state = State.Preview;
-                    }
-
-                    if (GUILayout.Button("Clear modifications"))
-                    {
-                        DestroyGeneratedGOs();
-                        constraint.data.ReadData = new WeightedTransformArray();
-                        constraint.data.WriteData = new WeightedTransformArray();
                     }
 
                     break;
@@ -190,40 +182,29 @@ namespace ScalableRig
             void GenerateNewGosWithOffsetsAndApplyToConstraint(
                 List<(Transform target, Vector3 pos, Vector3 scale)> localOffsets)
             {
-                DestroyGeneratedGOs();
-
-                var read = new WeightedTransformArray();
-                var write = new WeightedTransformArray();
+                var bones = new WeightedTransformArray();
                 var max = Mathf.Min(8, localOffsets.Count);
+                var custom = new ScalePosition[max];
                 for (int i = 0; i < max; i++)
                 {
                     var (transform, localPos, localScale) = localOffsets[i];
-
-                    var newParent = new GameObject($"{transform.name}_Parent");
-                    newParent.transform.position = transform.position;
-                    newParent.transform.SetParent(constraint.transform, true);
-
-                    var newTarget = new GameObject($"{transform.name}_Target");
-                    newTarget.transform.position = transform.position;
-                    newTarget.transform.SetParent(newParent.transform);
-                    newTarget.transform.localScale = localScale;
-                    newTarget.transform.localPosition = localPos;
-                    read.Add(new WeightedTransform(newTarget.transform, 1));
-                    write.Add(new WeightedTransform(transform, 0));
+                    custom[i] = new ScalePosition(localScale, localPos);
+                    bones.Add(new WeightedTransform(transform, 1));
                 }
 
-                constraint.data.ReadData = read;
-                constraint.data.WriteData = write;
+                constraint.data.Bones = bones;
+                constraint.data.ScaleData = custom;
             }
 
             void ApplyPreview()
             {
-                for (int i = 0; i < constraint.data.ReadData.Count; i++)
+                var bones = constraint.data.Bones;
+                var customData = constraint.data.ScaleData;
+                for (int i = 0; i < bones.Count; i++)
                 {
-                    var read = constraint.data.ReadData[i];
-                    var write = constraint.data.WriteData[i];
-                    write.transform.localPosition = read.transform.localPosition;
-                    write.transform.localScale = read.transform.localScale;
+                    var bone = constraint.data.Bones[i];
+                    bone.transform.localPosition = customData[i].Position;
+                    bone.transform.localScale = customData[i].Scale;
                 }
             }
 
@@ -243,15 +224,6 @@ namespace ScalableRig
                 foreach (var bone in bones)
                 {
                     _localDefaultPositions.Add(bone, (bone.localPosition, bone.localScale, bone.localRotation));
-                }
-            }
-
-            void DestroyGeneratedGOs()
-            {
-                for (int i = constraint.transform.childCount - 1; i >= 0; i--)
-                {
-                    var child = constraint.transform.GetChild(i);
-                    DestroyImmediate(child.gameObject);
                 }
             }
         }

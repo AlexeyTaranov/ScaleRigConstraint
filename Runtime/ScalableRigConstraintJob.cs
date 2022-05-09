@@ -8,8 +8,8 @@ namespace ScalableRig
 {
     public struct ScalableRigConstraintJob : IWeightedAnimationJob
     {
-        public NativeArray<ReadOnlyTransformHandle> read;
-        public NativeArray<ReadWriteTransformHandle> write;
+        public NativeArray<ScalePosition> scalePositions;
+        public NativeArray<ReadWriteTransformHandle> bones;
 
         public NativeArray<PropertyStreamHandle> readWeightHandles;
         public NativeArray<float> weightBuffers;
@@ -30,20 +30,20 @@ namespace ScalableRig
         {
             AnimationStreamHandleUtility.ReadFloats(stream, readWeightHandles, weightBuffers);
             var weightAll = jobWeight.Get(stream);
-            for (int i = 0; i < read.Length; i++)
+            for (int i = 0; i < scalePositions.Length; i++)
             {
-                var readHandle = read[i];
-                var writeHandle = write[i];
+                var readHandle = scalePositions[i];
+                var boneHandle = bones[i];
                 var weight = weightBuffers[i] * weightAll;
                 var aScale = defaultLocalScales[i];
-                var bScale = readHandle.GetLocalScale(stream);
+                var bScale = readHandle.Scale;
                 var scale = Vector3.Lerp(aScale, bScale, weight);
-                writeHandle.SetLocalScale(stream, scale);
+                boneHandle.SetLocalScale(stream, scale);
 
                 var aPos = defaultLocalPositions[i];
-                var bPos = readHandle.GetLocalPosition(stream);
+                var bPos = readHandle.Position;
                 var lPos = Vector3.Lerp(aPos, bPos, weight);
-                writeHandle.SetLocalPosition(stream, lPos);
+                boneHandle.SetLocalPosition(stream, lPos);
             }
         }
     }
@@ -54,30 +54,31 @@ namespace ScalableRig
         public override ScalableRigConstraintJob Create(Animator animator, ref ScalableRigConstraintJobData data,
             Component component)
         {
-            WeightedTransformArrayBinder.BindReadOnlyTransforms(animator, component, data.ReadData,
-                out var readTransforms);
-            WeightedTransformArrayBinder.BindReadWriteTransforms(animator, component, data.WriteData,
-                out var writeTransforms);
-            WeightedTransformArrayBinder.BindWeights(animator, component, data.ReadData,
-                ConstraintsUtils.ConstructConstraintDataPropertyName(nameof(ScalableRigConstraintJobData.ReadData)),
+            WeightedTransformArrayBinder.BindWeights(animator, component, data.Bones,
+                ConstraintsUtils.ConstructConstraintDataPropertyName(nameof(ScalableRigConstraintJobData.Bones)),
                 out var readWeights);
-            var defaultLocalScales = new NativeArray<Vector3>(data.WriteData.Count, Allocator.Persistent,
+            WeightedTransformArrayBinder.BindReadWriteTransforms(animator, component, data.Bones,
+                out var boneTransforms);
+            var defaultLocalScales = new NativeArray<Vector3>(data.ScaleData.Length, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
-            var defaultLocalPositions = new NativeArray<Vector3>(data.WriteData.Count, Allocator.Persistent,
+            var defaultLocalPositions = new NativeArray<Vector3>(data.ScaleData.Length, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
-            for (int i = 0; i < data.WriteData.Count; i++)
+            var customScalesAndPositions = new NativeArray<ScalePosition>(data.ScaleData.Length, Allocator.Persistent,
+                NativeArrayOptions.UninitializedMemory);
+            for (int i = 0; i < data.Bones.Count; i++)
             {
-                var transform = data.WriteData[i].transform;
+                var transform = data.Bones[i].transform;
                 defaultLocalScales[i] = transform.localScale;
                 defaultLocalPositions[i] = transform.localPosition;
+                customScalesAndPositions[i] = data.ScaleData[i];
             }
 
             var job = new ScalableRigConstraintJob
             {
-                read = readTransforms,
-                write = writeTransforms,
+                bones = boneTransforms,
                 readWeightHandles = readWeights,
-                weightBuffers = new NativeArray<float>(data.ReadData.Count,Allocator.Persistent,NativeArrayOptions.UninitializedMemory),
+                scalePositions = customScalesAndPositions,
+                weightBuffers = new NativeArray<float>(data.Bones.Count,Allocator.Persistent,NativeArrayOptions.UninitializedMemory),
                 jobWeight = FloatProperty.Bind(animator, component, ScalableRigConstraint.WeightPropertyName),
                 defaultLocalPositions = defaultLocalPositions,
                 defaultLocalScales = defaultLocalScales
@@ -88,8 +89,8 @@ namespace ScalableRig
 
         public override void Destroy(ScalableRigConstraintJob job)
         {
-            job.read.Dispose();
-            job.write.Dispose();
+            job.scalePositions.Dispose();
+            job.bones.Dispose();
             job.weightBuffers.Dispose();
             job.readWeightHandles.Dispose();
             job.defaultLocalPositions.Dispose();
