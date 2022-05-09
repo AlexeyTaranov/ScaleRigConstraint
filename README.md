@@ -2,7 +2,7 @@
 
 
 # Scale constraint
-#### Scale constraint allow modify scale at runtime.
+## (Unity Animation) Scale constraint allow modify scale at runtime.
 
 [![](https://github.com/AlexeyTaranov/ScaleConstraint/blob/dev/Documentation~/Preview.gif "Scale constraint preview")](https://github.com/AlexeyTaranov/ScaleConstraint/blob/dev/Documentation~/Preview.gif "Scale constraint preview")
 
