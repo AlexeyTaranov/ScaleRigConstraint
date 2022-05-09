@@ -1,12 +1,12 @@
 {
-  "name": "com.alexeytaranov.scalablerig",
-  "version": "0.0.1",
-  "displayName": "Scalable Rig",
-  "description": "Scalable Rig for Animation Rigging",
+  "name": "com.alexeytaranov.scaleconstraint",
+  "version": "0.1.0",
+  "displayName": "Scale Constraint",
+  "description": "Scale Constraint for Animation Rigging",
   "unity": "2020.1",
   "unityRelease": "0b1",
   "dependencies": {
-    "com.unity.animation.rigging": "1.0.0"
+    "com.unity.animation.rigging": "1.2.0"
   },
   "author": {
     "name": "Alexey Taranov",
