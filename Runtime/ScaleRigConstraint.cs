@@ -2,21 +2,21 @@
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
 
-namespace ScaleConstraintAnimation
+namespace ScaleRigConstraintAnimation
 {
-    public class ScaleConstraint : RigConstraint<
-        ScaleConstraintJob,
-        ScaleConstraintJobData,
-        ScalableRigConstraintBinder>
+    public class ScaleRigConstraint : RigConstraint<
+        ScaleRigConstraintJob,
+        ScaleRigConstraintJobData,
+        ScaleRigConstraintBinder>
     {
         internal static string WeightPropertyName => nameof(m_Weight);
     }
 
     [Serializable]
-    public struct ScaleConstraintJobData : IAnimationJobData
+    public struct ScaleRigConstraintJobData : IAnimationJobData
     {
         public ScalePosition[] scaleData;
-        [SyncSceneToStream, Range(0, 1)] public WeightedTransformArray bones;
+        [SyncSceneToStream, WeightRange(0f, 1f)] public WeightedTransformArray bones;
 
         public bool IsValid()
         {

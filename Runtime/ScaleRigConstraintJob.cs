@@ -3,9 +3,9 @@ using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Animations.Rigging;
 
-namespace ScaleConstraintAnimation
+namespace ScaleRigConstraintAnimation
 {
-    public struct ScaleConstraintJob : IWeightedAnimationJob
+    public struct ScaleRigConstraintJob : IWeightedAnimationJob
     {
         public NativeArray<ScalePosition> scalePositions;
         public NativeArray<ReadWriteTransformHandle> bones;
@@ -47,14 +47,14 @@ namespace ScaleConstraintAnimation
         }
     }
 
-    public class ScalableRigConstraintBinder :
-        AnimationJobBinder<ScaleConstraintJob, ScaleConstraintJobData>
+    public class ScaleRigConstraintBinder :
+        AnimationJobBinder<ScaleRigConstraintJob, ScaleRigConstraintJobData>
     {
-        public override ScaleConstraintJob Create(Animator animator, ref ScaleConstraintJobData data,
+        public override ScaleRigConstraintJob Create(Animator animator, ref ScaleRigConstraintJobData data,
             Component component)
         {
             WeightedTransformArrayBinder.BindWeights(animator, component, data.bones,
-                ConstraintsUtils.ConstructConstraintDataPropertyName(nameof(ScaleConstraintJobData.bones)),
+                ConstraintsUtils.ConstructConstraintDataPropertyName(nameof(ScaleRigConstraintJobData.bones)),
                 out var readWeights);
             WeightedTransformArrayBinder.BindReadWriteTransforms(animator, component, data.bones,
                 out var boneTransforms);
@@ -72,14 +72,14 @@ namespace ScaleConstraintAnimation
                 customScalesAndPositions[i] = data.scaleData[i];
             }
 
-            var job = new ScaleConstraintJob
+            var job = new ScaleRigConstraintJob
             {
                 bones = boneTransforms,
                 readWeightHandles = readWeights,
                 scalePositions = customScalesAndPositions,
                 weightBuffers = new NativeArray<float>(data.bones.Count, Allocator.Persistent,
                     NativeArrayOptions.UninitializedMemory),
-                jobWeight = FloatProperty.Bind(animator, component, ScaleConstraint.WeightPropertyName),
+                jobWeight = FloatProperty.Bind(animator, component, ScaleRigConstraint.WeightPropertyName),
                 defaultLocalPositions = defaultLocalPositions,
                 defaultLocalScales = defaultLocalScales
             };
@@ -87,7 +87,7 @@ namespace ScaleConstraintAnimation
         }
 
 
-        public override void Destroy(ScaleConstraintJob job)
+        public override void Destroy(ScaleRigConstraintJob job)
         {
             job.scalePositions.Dispose();
             job.bones.Dispose();

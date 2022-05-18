@@ -1,10 +1,9 @@
 {
-    "name": "ScaleConstraint.Editor",
+    "name": "ScaleRigConstraint.Editor",
     "rootNamespace": "",
     "references": [
         "GUID:b90ce523341911e419923d56e05b5b19",
         "GUID:7f7d1af65c2641843945d409d28f2e20",
-        "GUID:af4a3ceb227b8f94cb8375f40e156398",
         "GUID:343deaaf83e0cee4ca978e7df0b80d21",
         "GUID:2bafac87e7f4b9b418d9448d219b01ab",
         "GUID:27619889b8ba8c24980f49ee34dbb44a",
