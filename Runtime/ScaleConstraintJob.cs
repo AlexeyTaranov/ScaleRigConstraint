@@ -53,23 +53,23 @@ namespace ScaleConstraintAnimation
         public override ScaleConstraintJob Create(Animator animator, ref ScaleConstraintJobData data,
             Component component)
         {
-            WeightedTransformArrayBinder.BindWeights(animator, component, data.Bones,
-                ConstraintsUtils.ConstructConstraintDataPropertyName(nameof(ScaleConstraintJobData.Bones)),
+            WeightedTransformArrayBinder.BindWeights(animator, component, data.bones,
+                ConstraintsUtils.ConstructConstraintDataPropertyName(nameof(ScaleConstraintJobData.bones)),
                 out var readWeights);
-            WeightedTransformArrayBinder.BindReadWriteTransforms(animator, component, data.Bones,
+            WeightedTransformArrayBinder.BindReadWriteTransforms(animator, component, data.bones,
                 out var boneTransforms);
-            var defaultLocalScales = new NativeArray<Vector3>(data.ScaleData.Length, Allocator.Persistent,
+            var defaultLocalScales = new NativeArray<Vector3>(data.scaleData.Length, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
-            var defaultLocalPositions = new NativeArray<Vector3>(data.ScaleData.Length, Allocator.Persistent,
+            var defaultLocalPositions = new NativeArray<Vector3>(data.scaleData.Length, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
-            var customScalesAndPositions = new NativeArray<ScalePosition>(data.ScaleData.Length, Allocator.Persistent,
+            var customScalesAndPositions = new NativeArray<ScalePosition>(data.scaleData.Length, Allocator.Persistent,
                 NativeArrayOptions.UninitializedMemory);
-            for (int i = 0; i < data.Bones.Count; i++)
+            for (int i = 0; i < data.bones.Count; i++)
             {
-                var transform = data.Bones[i].transform;
+                var transform = data.bones[i].transform;
                 defaultLocalScales[i] = transform.localScale;
                 defaultLocalPositions[i] = transform.localPosition;
-                customScalesAndPositions[i] = data.ScaleData[i];
+                customScalesAndPositions[i] = data.scaleData[i];
             }
 
             var job = new ScaleConstraintJob
@@ -77,7 +77,7 @@ namespace ScaleConstraintAnimation
                 bones = boneTransforms,
                 readWeightHandles = readWeights,
                 scalePositions = customScalesAndPositions,
-                weightBuffers = new NativeArray<float>(data.Bones.Count, Allocator.Persistent,
+                weightBuffers = new NativeArray<float>(data.bones.Count, Allocator.Persistent,
                     NativeArrayOptions.UninitializedMemory),
                 jobWeight = FloatProperty.Bind(animator, component, ScaleConstraint.WeightPropertyName),
                 defaultLocalPositions = defaultLocalPositions,

@@ -7,47 +7,48 @@ using UnityEditor.Animations.Rigging;
 using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
+using UnityEngine.Assertions;
 
 namespace ScaleConstraintAnimation
 {
     [CustomEditor(typeof(ScaleConstraint))]
     public class ScaleConstraintEditor : Editor
     {
-        const float MinOffset = 0.1f;
-        private SerializedProperty _weightProperty;
-        private ReorderableList _reorderableList;
-        private ScaleConstraint _constraint;
+        private const float MinOffset = 0.1f;
 
-        private Func<bool> _isCompleteModification;
+        private SerializedProperty weightProperty;
+        private ReorderableList reorderableList;
+        private ScaleConstraint constraint;
+
+        private Func<bool> isCompleteModification;
 
         private struct TransformValue
         {
-            public Vector3 Position;
-            public Vector3 Scale;
-            public Quaternion Rotation;
+            public Vector3 position;
+            public Vector3 scale;
+            public Quaternion rotation;
         }
 
         public void OnEnable()
         {
-            _weightProperty = serializedObject.FindProperty("m_Weight");
-            _constraint = (ScaleConstraint)serializedObject.targetObject;
+            weightProperty = serializedObject.FindProperty("m_Weight");
+            constraint = (ScaleConstraint)serializedObject.targetObject;
             var data = serializedObject.FindProperty("m_Data");
-            var readData = data.FindPropertyRelative(nameof(ScaleConstraint.data.Bones));
-            var readFieldInfo = _constraint.data.GetType().GetField(nameof(ScaleConstraint.data.Bones));
+            var readData = data.FindPropertyRelative(nameof(ScaleConstraint.data.bones));
+            var readFieldInfo = constraint.data.GetType().GetField(nameof(ScaleConstraint.data.bones));
             var range = readFieldInfo.GetCustomAttribute<RangeAttribute>();
-            _reorderableList =
-                WeightedTransformHelper.CreateReorderableList(readData, ref _constraint.data.Bones, range);
-            _reorderableList.displayAdd = false;
-            _reorderableList.displayRemove = false;
-            _reorderableList.draggable = false;
+            reorderableList = WeightedTransformHelper.CreateReorderableList(readData, ref constraint.data.bones, range);
+            reorderableList.displayAdd = false;
+            reorderableList.displayRemove = false;
+            reorderableList.draggable = false;
         }
 
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
-            EditorGUILayout.PropertyField(_weightProperty);
-            _reorderableList.DoLayoutList();
-            _reorderableList.list = _constraint.data.Bones;
+            EditorGUILayout.PropertyField(weightProperty);
+            reorderableList.DoLayoutList();
+            reorderableList.list = constraint.data.bones;
             DrawButtonsAndExecuteModifications();
             serializedObject.ApplyModifiedProperties();
         }
@@ -60,45 +61,44 @@ namespace ScaleConstraintAnimation
                 return;
             }
 
-            if (_isCompleteModification?.Invoke() == true)
+            if (isCompleteModification?.Invoke() == true)
             {
-                _isCompleteModification = null;
+                isCompleteModification = null;
             }
 
-            if (_isCompleteModification == null)
+            if (isCompleteModification == null)
             {
                 if (GUILayout.Button("Start Modify"))
                 {
-                    _isCompleteModification = GenerateNewConstraintData();
+                    isCompleteModification = GenerateNewConstraintData();
                 }
 
                 if (GUILayout.Button("Preview"))
                 {
-                    _isCompleteModification = ShowPreview();
+                    isCompleteModification = ShowPreview();
                 }
             }
         }
 
         Dictionary<Transform, TransformValue> GetDefaultTransformValues()
         {
-            var defaultPositions = new Dictionary<Transform, TransformValue>();
-            var animator = _constraint.transform.GetComponentInParent<Animator>();
+            var animator = constraint.transform.GetComponentInParent<Animator>();
+            Assert.IsNotNull(animator,
+                $"[{nameof(ScaleConstraint)}] Can't find animator in parent for constraint: {constraint.name}");
             if (animator == null)
             {
-                Debug.LogError(
-                    $"[{nameof(ScaleConstraint)}] Can't find animator in parent for constraint: {_constraint.name}",
-                    _constraint);
-                return defaultPositions;
+                return null;
             }
 
+            var defaultPositions = new Dictionary<Transform, TransformValue>();
             var bones = animator.GetComponentsInChildren<Transform>();
             foreach (var bone in bones)
             {
                 defaultPositions.Add(bone, new TransformValue
                 {
-                    Position = bone.localPosition,
-                    Scale = bone.localScale,
-                    Rotation = bone.localRotation
+                    position = bone.localPosition,
+                    scale = bone.localScale,
+                    rotation = bone.localRotation
                 });
             }
 
@@ -108,7 +108,7 @@ namespace ScaleConstraintAnimation
         private Func<bool> GenerateNewConstraintData()
         {
             var defaultTransforms = GetDefaultTransformValues();
-            return DrawUI;
+            return defaultTransforms != null ? DrawUI : () => true;
 
             bool DrawUI()
             {
@@ -136,6 +136,11 @@ namespace ScaleConstraintAnimation
         private Func<bool> ShowPreview()
         {
             var defaultTransforms = GetDefaultTransformValues();
+            if (defaultTransforms == null)
+            {
+                return () => true;
+            }
+
             ApplyPreview();
             return DrawUI;
 
@@ -181,8 +186,8 @@ namespace ScaleConstraintAnimation
 
         bool IsUpdatedTransform(TransformValue defaultValue, Transform transform)
         {
-            bool isChangedValues = Vector3.Distance(defaultValue.Position, transform.localPosition) > MinOffset ||
-                                   Vector3.Distance(defaultValue.Scale, transform.localScale) > MinOffset;
+            bool isChangedValues = Vector3.Distance(defaultValue.position, transform.localPosition) > MinOffset ||
+                                   Vector3.Distance(defaultValue.scale, transform.localScale) > MinOffset;
             return isChangedValues;
         }
 
@@ -191,9 +196,9 @@ namespace ScaleConstraintAnimation
             foreach (var tuple in defaultValues)
             {
                 var inputT = tuple.Key;
-                inputT.localPosition = tuple.Value.Position;
-                inputT.localScale = tuple.Value.Scale;
-                inputT.localRotation = tuple.Value.Rotation;
+                inputT.localPosition = tuple.Value.position;
+                inputT.localScale = tuple.Value.scale;
+                inputT.localRotation = tuple.Value.rotation;
             }
         }
 
@@ -208,17 +213,17 @@ namespace ScaleConstraintAnimation
                 bones.Add(new WeightedTransform(modifiedObjects[i], 1));
             }
 
-            _constraint.data.Bones = bones;
-            _constraint.data.ScaleData = custom;
+            constraint.data.bones = bones;
+            constraint.data.scaleData = custom;
         }
 
         void ApplyPreview()
         {
-            var bones = _constraint.data.Bones;
-            var customData = _constraint.data.ScaleData;
+            var bones = constraint.data.bones;
+            var customData = constraint.data.scaleData;
             for (int i = 0; i < bones.Count; i++)
             {
-                var bone = _constraint.data.Bones[i];
+                var bone = constraint.data.bones[i];
                 bone.transform.localPosition = customData[i].Position;
                 bone.transform.localScale = customData[i].Scale;
             }

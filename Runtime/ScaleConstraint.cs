@@ -15,10 +15,26 @@ namespace ScaleConstraintAnimation
     [Serializable]
     public struct ScaleConstraintJobData : IAnimationJobData
     {
-        public ScalePosition[] ScaleData;
-        [SyncSceneToStream, Range(0, 1)] public WeightedTransformArray Bones;
+        public ScalePosition[] scaleData;
+        [SyncSceneToStream, Range(0, 1)] public WeightedTransformArray bones;
 
-        public bool IsValid() => true;
+        public bool IsValid()
+        {
+            if (scaleData.Length != bones.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < bones.Count; i++)
+            {
+                if (bones[i].transform == null)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
 
         public void SetDefaultValues()
         {
@@ -28,17 +44,17 @@ namespace ScaleConstraintAnimation
     [Serializable]
     public struct ScalePosition
     {
-        [SerializeField] private Vector3 _scale;
-        [SerializeField] private Vector3 _position;
+        [SerializeField] private Vector3 scale;
+        [SerializeField] private Vector3 position;
 
-        public Vector3 Scale => _scale;
-        public Vector3 Position => _position;
+        public Vector3 Scale => scale;
+        public Vector3 Position => position;
 
 
         public ScalePosition(Vector3 scale, Vector3 position)
         {
-            _scale = scale;
-            _position = position;
+            this.scale = scale;
+            this.position = position;
         }
     }
 }
