@@ -1,8 +1,8 @@
 {
   "name": "com.alexeytaranov.scaleconstraint",
-  "version": "0.1.0",
-  "displayName": "Scale Constraint",
-  "description": "Scale Constraint for Animation Rigging",
+  "version": "0.1.1",
+  "displayName": "Scale Rig Constraint",
+  "description": "Scale Rig Constraint for Animation Rigging",
   "unity": "2020.1",
   "unityRelease": "0b1",
   "dependencies": {

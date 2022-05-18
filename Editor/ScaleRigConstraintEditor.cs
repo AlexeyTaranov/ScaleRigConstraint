@@ -1,24 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using UnityEditor;
-using UnityEditor.Animations.Rigging;
-using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
 using UnityEngine.Assertions;
 
-namespace ScaleConstraintAnimation
+namespace ScaleRigConstraintAnimation
 {
-    [CustomEditor(typeof(ScaleConstraint))]
-    public class ScaleConstraintEditor : Editor
+    [CustomEditor(typeof(ScaleRigConstraint))]
+    public class ScaleRigConstraintEditor : Editor
     {
         private const float MinOffset = 0.1f;
 
         private SerializedProperty weightProperty;
-        private ReorderableList reorderableList;
-        private ScaleConstraint constraint;
+        private SerializedProperty bonesProperty;
+        private ScaleRigConstraint rigConstraint;
 
         private Func<bool> isCompleteModification;
 
@@ -32,23 +29,16 @@ namespace ScaleConstraintAnimation
         public void OnEnable()
         {
             weightProperty = serializedObject.FindProperty("m_Weight");
-            constraint = (ScaleConstraint)serializedObject.targetObject;
+            rigConstraint = (ScaleRigConstraint)serializedObject.targetObject;
             var data = serializedObject.FindProperty("m_Data");
-            var readData = data.FindPropertyRelative(nameof(ScaleConstraint.data.bones));
-            var readFieldInfo = constraint.data.GetType().GetField(nameof(ScaleConstraint.data.bones));
-            var range = readFieldInfo.GetCustomAttribute<RangeAttribute>();
-            reorderableList = WeightedTransformHelper.CreateReorderableList(readData, ref constraint.data.bones, range);
-            reorderableList.displayAdd = false;
-            reorderableList.displayRemove = false;
-            reorderableList.draggable = false;
+            bonesProperty = data.FindPropertyRelative(nameof(ScaleRigConstraint.data.bones));
         }
 
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
             EditorGUILayout.PropertyField(weightProperty);
-            reorderableList.DoLayoutList();
-            reorderableList.list = constraint.data.bones;
+            EditorGUILayout.PropertyField(bonesProperty);
             DrawButtonsAndExecuteModifications();
             serializedObject.ApplyModifiedProperties();
         }
@@ -82,9 +72,9 @@ namespace ScaleConstraintAnimation
 
         Dictionary<Transform, TransformValue> GetDefaultTransformValues()
         {
-            var animator = constraint.transform.GetComponentInParent<Animator>();
+            var animator = rigConstraint.transform.GetComponentInParent<Animator>();
             Assert.IsNotNull(animator,
-                $"[{nameof(ScaleConstraint)}] Can't find animator in parent for constraint: {constraint.name}");
+                $"[{nameof(ScaleRigConstraint)}] Can't find animator in parent for constraint: {rigConstraint.name}");
             if (animator == null)
             {
                 return null;
@@ -213,17 +203,17 @@ namespace ScaleConstraintAnimation
                 bones.Add(new WeightedTransform(modifiedObjects[i], 1));
             }
 
-            constraint.data.bones = bones;
-            constraint.data.scaleData = custom;
+            rigConstraint.data.bones = bones;
+            rigConstraint.data.scaleData = custom;
         }
 
         void ApplyPreview()
         {
-            var bones = constraint.data.bones;
-            var customData = constraint.data.scaleData;
+            var bones = rigConstraint.data.bones;
+            var customData = rigConstraint.data.scaleData;
             for (int i = 0; i < bones.Count; i++)
             {
-                var bone = constraint.data.bones[i];
+                var bone = rigConstraint.data.bones[i];
                 bone.transform.localPosition = customData[i].Position;
                 bone.transform.localScale = customData[i].Scale;
             }
