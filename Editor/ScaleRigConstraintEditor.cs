@@ -43,7 +43,7 @@ namespace ScaleRigConstraintAnimation
             serializedObject.ApplyModifiedProperties();
         }
 
-        void DrawButtonsAndExecuteModifications()
+        private void DrawButtonsAndExecuteModifications()
         {
             if (Application.isPlaying)
             {
@@ -70,7 +70,7 @@ namespace ScaleRigConstraintAnimation
             }
         }
 
-        Dictionary<Transform, TransformValue> GetDefaultTransformValues()
+        private Dictionary<Transform, TransformValue> GetDefaultTransformValues()
         {
             var animator = rigConstraint.transform.GetComponentInParent<Animator>();
             Assert.IsNotNull(animator,
@@ -115,6 +115,7 @@ namespace ScaleRigConstraintAnimation
                     ApplyNewConstraintData(modifiedTransforms);
                     RestoreLocalTranslations(ref defaultTransforms);
                     serializedObject.ApplyModifiedProperties();
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(serializedObject.targetObject);
                     return true;
                 }
 
@@ -151,7 +152,7 @@ namespace ScaleRigConstraintAnimation
             }
         }
 
-        void DrawLabelWithModifiedObjectsCount(in Dictionary<Transform, TransformValue> defaultValues)
+        private void DrawLabelWithModifiedObjectsCount(in Dictionary<Transform, TransformValue> defaultValues)
         {
             var modifiedObjects = GetModifiedObjects(defaultValues);
             var modifiedObjectsCount = modifiedObjects.Count();
@@ -174,12 +175,12 @@ namespace ScaleRigConstraintAnimation
             }
         }
 
-        IEnumerable<Transform> GetModifiedObjects(in Dictionary<Transform, TransformValue> defaultValues)
+        private IEnumerable<Transform> GetModifiedObjects(in Dictionary<Transform, TransformValue> defaultValues)
         {
             return defaultValues.Where(pair => IsUpdatedTransform(pair.Value, pair.Key)).Select((pair => pair.Key));
         }
 
-        bool IsUpdatedTransform(TransformValue defaultValue, Transform transform)
+        private bool IsUpdatedTransform(TransformValue defaultValue, Transform transform)
         {
             bool isChangedValues = Vector3.Distance(defaultValue.position, transform.localPosition) > MinOffset ||
                                    Vector3.Distance(defaultValue.scale, transform.localScale) > MinOffset;
@@ -197,7 +198,7 @@ namespace ScaleRigConstraintAnimation
             }
         }
 
-        void ApplyNewConstraintData(Transform[] modifiedObjects)
+        private void ApplyNewConstraintData(Transform[] modifiedObjects)
         {
             var bones = new WeightedTransformArray();
             var max = Mathf.Min(8, modifiedObjects.Length);
@@ -212,7 +213,7 @@ namespace ScaleRigConstraintAnimation
             rigConstraint.data.scaleData = custom;
         }
 
-        void ApplyPreview()
+        private void ApplyPreview()
         {
             var bones = rigConstraint.data.bones;
             var customData = rigConstraint.data.scaleData;
