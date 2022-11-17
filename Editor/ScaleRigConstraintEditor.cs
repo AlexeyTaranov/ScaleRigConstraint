@@ -98,7 +98,12 @@ namespace ScaleRigConstraintAnimation
         private Func<bool> GenerateNewConstraintData()
         {
             var defaultTransforms = GetDefaultTransformValues();
-            return defaultTransforms != null ? DrawUI : () => true;
+            if (defaultTransforms != null)
+            {
+                return DrawUI;
+            }
+
+            return () => true;
 
             bool DrawUI()
             {
