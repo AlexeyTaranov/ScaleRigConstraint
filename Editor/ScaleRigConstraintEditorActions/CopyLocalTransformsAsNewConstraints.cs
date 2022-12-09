@@ -102,11 +102,11 @@ namespace ScaleRigConstraintAnimation.ScaleRigConstraintEditorActions
             }
         }
 
-        private HashSet<PathTransform> GeneratePathPairsForChildTransforms(Transform parent)
+        private IEnumerable<PathTransform> GeneratePathPairsForChildTransforms(Transform parent)
         {
             var childTransforms = parent.GetComponentsInChildren<Transform>();
             return childTransforms.Select(t => new PathTransform()
-                { Path = GenerateUnityHierarchyPathToParent(t, parent), Transform = t }).ToHashSet();
+                { Path = GenerateUnityHierarchyPathToParent(t, parent), Transform = t });
         }
 
         private string GenerateUnityHierarchyPathToParent(Transform obj, Transform parent)
@@ -133,7 +133,7 @@ namespace ScaleRigConstraintAnimation.ScaleRigConstraintEditorActions
             fromObjectToParent.Reverse();
             var fromParentToObject = fromObjectToParent;
             var transformNames = fromParentToObject.Select(t => t.name);
-            return string.Join(Path.DirectorySeparatorChar, transformNames);
+            return string.Join(Path.DirectorySeparatorChar.ToString(), transformNames);
         }
 
         private IReadOnlyList<(Transform source, Transform rig)> GetTransformByEqualHierarchyLocalPath(
