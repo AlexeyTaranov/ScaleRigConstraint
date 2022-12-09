@@ -133,6 +133,11 @@ namespace ScaleRigConstraintAnimation
                 {
                     currentUpdateRigAction = new ShowPreviewAction(this);
                 }
+
+                if (GUILayout.Button("Copy local transforms from other"))
+                {
+                    currentUpdateRigAction = new CopyLocalTransformsAsNewConstraints(this);
+                }
             }
         }
 
