@@ -1,30 +1,76 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
+using ScaleRigConstraintAnimation.ScaleRigConstraintEditorActions;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.Animations.Rigging;
-using UnityEngine.Assertions;
 
 namespace ScaleRigConstraintAnimation
 {
-    [CustomEditor(typeof(ScaleRigConstraint))]
-    public class ScaleRigConstraintEditor : Editor
+    public abstract class BaseScaleRigConstraintEditorAction
+    {
+        protected readonly ScaleRigConstraintEditor ScaleRigEditor;
+        protected readonly Dictionary<Transform, TransformValue> DefaultTransformValues;
+
+        protected BaseScaleRigConstraintEditorAction(ScaleRigConstraintEditor scaleRigEditor)
+        {
+            ScaleRigEditor = scaleRigEditor;
+            DefaultTransformValues = scaleRigEditor.GetCurrentTransformValues();
+        }
+
+        public abstract bool IsCompleteModification();
+
+        public void RestoreDefaultTransformsWithoutModifications()
+        {
+            foreach (var pair in DefaultTransformValues)
+            {
+                pair.Value.ApplyLocalValues(pair.Key);
+            }
+        }
+    }
+
+    public struct TransformValue
     {
         private const float MinOffset = 0.1f;
 
+        private Vector3 position;
+        private Vector3 scale;
+        private Quaternion rotation;
+
+        public static TransformValue GetLocalTransformValue(Transform transform)
+        {
+            return new TransformValue()
+            {
+                position = transform.localPosition,
+                rotation = transform.localRotation,
+                scale = transform.localScale
+            };
+        }
+
+        public void ApplyLocalValues(Transform transform)
+        {
+            transform.localPosition = position;
+            transform.localScale = scale;
+            transform.localRotation = rotation;
+        }
+
+        public bool IsHaveLocalTransformOffset(Transform transform)
+        {
+            bool isChangedValues = Vector3.Distance(position, transform.localPosition) > MinOffset ||
+                                   Vector3.Distance(scale, transform.localScale) > MinOffset;
+            return isChangedValues;
+        }
+    }
+
+    [CustomEditor(typeof(ScaleRigConstraint))]
+    public class ScaleRigConstraintEditor : Editor
+    {
         private SerializedProperty weightProperty;
         private SerializedProperty bonesProperty;
-        private ScaleRigConstraint rigConstraint;
 
-        private Func<bool> isCompleteModification;
+        private Animator animator;
 
-        private struct TransformValue
-        {
-            public Vector3 position;
-            public Vector3 scale;
-            public Quaternion rotation;
-        }
+        private BaseScaleRigConstraintEditorAction currentUpdateRigAction;
+
+        public ScaleRigConstraint rigConstraint;
 
         public void OnEnable()
         {
@@ -32,6 +78,12 @@ namespace ScaleRigConstraintAnimation
             rigConstraint = (ScaleRigConstraint)serializedObject.targetObject;
             var data = serializedObject.FindProperty("m_Data");
             bonesProperty = data.FindPropertyRelative(nameof(ScaleRigConstraint.data.bones));
+            animator = rigConstraint.gameObject.GetComponentInParent<Animator>();
+        }
+
+        public void OnDisable()
+        {
+            currentUpdateRigAction?.RestoreDefaultTransformsWithoutModifications();
         }
 
         public override void OnInspectorGUI()
@@ -43,6 +95,7 @@ namespace ScaleRigConstraintAnimation
             serializedObject.ApplyModifiedProperties();
         }
 
+
         private void DrawButtonsAndExecuteModifications()
         {
             if (Application.isPlaying)
@@ -51,178 +104,48 @@ namespace ScaleRigConstraintAnimation
                 return;
             }
 
-            if (isCompleteModification?.Invoke() == true)
+            if (animator == null)
             {
-                isCompleteModification = null;
+                animator = rigConstraint.gameObject.GetComponentInParent<Animator>();
             }
 
-            if (isCompleteModification == null)
+            if (animator == null)
+            {
+                GUILayout.Label("Can't find animator!");
+            }
+
+            var isUpdatedAction = currentUpdateRigAction?.IsCompleteModification() == true;
+
+            if (isUpdatedAction)
+            {
+                currentUpdateRigAction.RestoreDefaultTransformsWithoutModifications();
+                currentUpdateRigAction = null;
+            }
+
+            if (currentUpdateRigAction == null)
             {
                 if (GUILayout.Button("Start Modify"))
                 {
-                    isCompleteModification = GenerateNewConstraintData();
+                    currentUpdateRigAction = new GenerateNewConstraintDataAction(this);
                 }
 
                 if (GUILayout.Button("Preview"))
                 {
-                    isCompleteModification = ShowPreview();
+                    currentUpdateRigAction = new ShowPreviewAction(this);
                 }
             }
         }
 
-        private Dictionary<Transform, TransformValue> GetDefaultTransformValues()
+        public Dictionary<Transform, TransformValue> GetCurrentTransformValues()
         {
-            var animator = rigConstraint.transform.GetComponentInParent<Animator>();
-            Assert.IsNotNull(animator,
-                $"[{nameof(ScaleRigConstraint)}] Can't find animator in parent for constraint: {rigConstraint.name}");
-            if (animator == null)
-            {
-                return null;
-            }
-
             var defaultPositions = new Dictionary<Transform, TransformValue>();
             var bones = animator.GetComponentsInChildren<Transform>();
             foreach (var bone in bones)
             {
-                defaultPositions.Add(bone, new TransformValue
-                {
-                    position = bone.localPosition,
-                    scale = bone.localScale,
-                    rotation = bone.localRotation
-                });
+                defaultPositions.Add(bone, TransformValue.GetLocalTransformValue(bone));
             }
 
             return defaultPositions;
-        }
-
-        private Func<bool> GenerateNewConstraintData()
-        {
-            var defaultTransforms = GetDefaultTransformValues();
-            if (defaultTransforms != null)
-            {
-                return DrawUI;
-            }
-
-            return () => true;
-
-            bool DrawUI()
-            {
-                DrawLabelWithModifiedObjectsCount(defaultTransforms);
-                if (GUILayout.Button("Apply"))
-                {
-                    var modifiedTransforms = defaultTransforms.Where(pair => IsUpdatedTransform(pair.Value, pair.Key))
-                        .Select(pair => pair.Key).ToArray();
-                    ApplyNewConstraintData(modifiedTransforms);
-                    RestoreLocalTranslations(ref defaultTransforms);
-                    serializedObject.ApplyModifiedProperties();
-                    PrefabUtility.RecordPrefabInstancePropertyModifications(serializedObject.targetObject);
-                    return true;
-                }
-
-                if (GUILayout.Button("Cancel"))
-                {
-                    RestoreLocalTranslations(ref defaultTransforms);
-                    return true;
-                }
-
-                return false;
-            }
-        }
-
-        private Func<bool> ShowPreview()
-        {
-            var defaultTransforms = GetDefaultTransformValues();
-            if (defaultTransforms == null)
-            {
-                return () => true;
-            }
-
-            ApplyPreview();
-            return DrawUI;
-
-            bool DrawUI()
-            {
-                if (GUILayout.Button("Cancel"))
-                {
-                    RestoreLocalTranslations(ref defaultTransforms);
-                    return true;
-                }
-
-                return false;
-            }
-        }
-
-        private void DrawLabelWithModifiedObjectsCount(in Dictionary<Transform, TransformValue> defaultValues)
-        {
-            var modifiedObjects = GetModifiedObjects(defaultValues);
-            var modifiedObjectsCount = modifiedObjects.Count();
-            var max = WeightedTransformArray.k_MaxLength;
-            var textLabel = $"Changed objects: {modifiedObjectsCount}, max: {max}.";
-            if (modifiedObjectsCount > max)
-            {
-                textLabel += " Will be saved only first 8 changes.";
-                var errorStyle = new GUIStyle()
-                    { fontStyle = FontStyle.Bold, normal = new GUIStyleState() { textColor = Color.red } };
-                GUILayout.Label(textLabel, errorStyle);
-            }
-            else
-            {
-                GUILayout.Label(textLabel);
-                foreach (var modifiedObject in modifiedObjects)
-                {
-                    GUILayout.Label($"Modified object: {modifiedObject.name}");
-                }
-            }
-        }
-
-        private IEnumerable<Transform> GetModifiedObjects(in Dictionary<Transform, TransformValue> defaultValues)
-        {
-            return defaultValues.Where(pair => IsUpdatedTransform(pair.Value, pair.Key)).Select((pair => pair.Key));
-        }
-
-        private bool IsUpdatedTransform(TransformValue defaultValue, Transform transform)
-        {
-            bool isChangedValues = Vector3.Distance(defaultValue.position, transform.localPosition) > MinOffset ||
-                                   Vector3.Distance(defaultValue.scale, transform.localScale) > MinOffset;
-            return isChangedValues;
-        }
-
-        private void RestoreLocalTranslations(ref Dictionary<Transform, TransformValue> defaultValues)
-        {
-            foreach (var tuple in defaultValues)
-            {
-                var inputT = tuple.Key;
-                inputT.localPosition = tuple.Value.position;
-                inputT.localScale = tuple.Value.scale;
-                inputT.localRotation = tuple.Value.rotation;
-            }
-        }
-
-        private void ApplyNewConstraintData(Transform[] modifiedObjects)
-        {
-            var bones = new WeightedTransformArray();
-            var max = Mathf.Min(8, modifiedObjects.Length);
-            var custom = new ScalePosition[max];
-            for (int i = 0; i < max; i++)
-            {
-                custom[i] = new ScalePosition(modifiedObjects[i].localScale, modifiedObjects[i].localPosition);
-                bones.Add(new WeightedTransform(modifiedObjects[i], 1));
-            }
-
-            rigConstraint.data.bones = bones;
-            rigConstraint.data.scaleData = custom;
-        }
-
-        private void ApplyPreview()
-        {
-            var bones = rigConstraint.data.bones;
-            var customData = rigConstraint.data.scaleData;
-            for (int i = 0; i < bones.Count; i++)
-            {
-                var bone = rigConstraint.data.bones[i];
-                bone.transform.localPosition = customData[i].Position;
-                bone.transform.localScale = customData[i].Scale;
-            }
         }
     }
 }

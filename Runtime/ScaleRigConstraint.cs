@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
 
@@ -16,7 +18,9 @@ namespace ScaleRigConstraintAnimation
     public struct ScaleRigConstraintJobData : IAnimationJobData
     {
         public ScalePosition[] scaleData;
-        [SyncSceneToStream, WeightRange(0f, 1f)] public WeightedTransformArray bones;
+
+        [SyncSceneToStream, WeightRange(0f, 1f)]
+        public WeightedTransformArray bones;
 
         public bool IsValid()
         {
@@ -39,6 +43,19 @@ namespace ScaleRigConstraintAnimation
         public void SetDefaultValues()
         {
         }
+
+        public void SetScaleData(IReadOnlyList<(ScalePosition scaleData, Transform transform)> localScaleData)
+        {
+            var weightBones = new WeightedTransformArray();
+            var max = Mathf.Min(WeightedTransformArray.k_MaxLength, localScaleData.Count);
+            for (int i = 0; i < max; i++)
+            {
+                weightBones.Add(new WeightedTransform(localScaleData[i].transform, 1));
+            }
+
+            bones = weightBones;
+            scaleData = localScaleData.Select(t => t.scaleData).Take(max).ToArray();
+        }
     }
 
     [Serializable]
@@ -55,6 +72,12 @@ namespace ScaleRigConstraintAnimation
         {
             this.scale = scale;
             this.position = position;
+        }
+
+        public ScalePosition(Transform transform)
+        {
+            scale = transform.localScale;
+            position = transform.localPosition;
         }
     }
 }
