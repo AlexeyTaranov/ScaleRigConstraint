@@ -39,8 +39,9 @@ namespace ScaleRigConstraintAnimation
                 var scale = Vector3.Lerp(aScale, bScale, weight);
                 boneHandle.SetLocalScale(stream, scale);
 
-                var aPos = defaultLocalPositions[i];
-                var bPos = readHandle.Position;
+                var offset = readHandle.Position - defaultLocalPositions[i];
+                var aPos = boneHandle.GetLocalPosition(stream);
+                var bPos = aPos + offset;
                 var lPos = Vector3.Lerp(aPos, bPos, weight);
                 boneHandle.SetLocalPosition(stream, lPos);
             }
