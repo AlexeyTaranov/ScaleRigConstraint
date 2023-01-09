@@ -29,7 +29,7 @@ namespace ScaleRigConstraintAnimation
 
     public struct TransformValue
     {
-        private const float MinOffset = 0.1f;
+        private const float MinOffset = 0.01f;
 
         private Vector3 position;
         private Vector3 scale;
@@ -54,8 +54,9 @@ namespace ScaleRigConstraintAnimation
 
         public bool IsHaveLocalTransformOffset(Transform transform)
         {
-            bool isChangedValues = Vector3.Distance(position, transform.localPosition) > MinOffset ||
-                                   Vector3.Distance(scale, transform.localScale) > MinOffset;
+            var positionOffset = Vector3.Distance(position, transform.localPosition);
+            var scaleOffset = Vector3.Distance(scale, transform.localScale);
+            bool isChangedValues = positionOffset > MinOffset || scaleOffset > MinOffset;
             return isChangedValues;
         }
     }
