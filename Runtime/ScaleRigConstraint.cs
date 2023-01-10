@@ -17,67 +17,63 @@ namespace ScaleRigConstraintAnimation
     [Serializable]
     public struct ScaleRigConstraintJobData : IAnimationJobData
     {
-        public ScalePosition[] scaleData;
+        [SerializeField] private TransformDataSerialize[] scaleData;
 
-        [SyncSceneToStream, WeightRange(0f, 1f)]
-        public WeightedTransformArray bones;
+        public IReadOnlyList<TransformDataSerialize> ScaleData => scaleData;
 
         public bool IsValid()
         {
-            if (scaleData.Length != bones.Count)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < bones.Count; i++)
-            {
-                if (bones[i].transform == null)
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return scaleData.Any(t => t.Transform == null) == false;
         }
 
         public void SetDefaultValues()
         {
         }
 
-        public void SetScaleData(IReadOnlyList<(ScalePosition scaleData, Transform transform)> localScaleData)
+        public void SetScaleData(IEnumerable<TransformDataSerialize> localScaleData)
         {
-            var weightBones = new WeightedTransformArray();
-            var max = Mathf.Min(WeightedTransformArray.k_MaxLength, localScaleData.Count);
-            for (int i = 0; i < max; i++)
-            {
-                weightBones.Add(new WeightedTransform(localScaleData[i].transform, 1));
-            }
-
-            bones = weightBones;
-            scaleData = localScaleData.Select(t => t.scaleData).Take(max).ToArray();
+            scaleData = localScaleData.ToArray();
         }
     }
 
     [Serializable]
-    public struct ScalePosition
+    public class TransformDataSerialize
     {
         [SerializeField] private Vector3 scale;
         [SerializeField] private Vector3 position;
+        [SerializeField] private Transform transform;
 
-        public Vector3 Scale => scale;
-        public Vector3 Position => position;
+        public Transform Transform => transform;
 
-
-        public ScalePosition(Vector3 scale, Vector3 position)
+        public TransformDataSerialize(Transform transform, Vector3 scale, Vector3 position)
         {
             this.scale = scale;
             this.position = position;
+            this.transform = transform;
         }
 
-        public ScalePosition(Transform transform)
+        public TransformDataSerialize(Transform transform)
         {
             scale = transform.localScale;
             position = transform.localPosition;
+            this.transform = transform;
+        }
+
+        public TransformData ToTransformData()
+        {
+            return new TransformData(scale, position);
+        }
+    }
+
+    public struct TransformData
+    {
+        public Vector3 Position { get; }
+        public Vector3 Scale { get; }
+
+        public TransformData(Vector3 scale, Vector3 position)
+        {
+            Scale = scale;
+            Position = position;
         }
     }
 }
