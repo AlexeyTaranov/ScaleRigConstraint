@@ -4,8 +4,6 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.Animations.Rigging;
-using Object = UnityEngine.Object;
 
 namespace ScaleRigConstraintAnimation.ScaleRigConstraintEditorActions
 {
@@ -73,33 +71,11 @@ namespace ScaleRigConstraintAnimation.ScaleRigConstraintEditorActions
             var updatedTransforms = sourceAndRigTransforms.Where(t =>
                 TransformValue.GetLocalTransformValue(t.rig).IsHaveLocalTransformOffset(t.source));
 
-            var customScaleDatas = updatedTransforms.Select(t => (new ScalePosition(t.source), t.rig)).ToArray();
-
-            //Cleanup old rig data
-            var maxScalesCount = WeightedTransformArray.k_MaxLength;
-            if (customScaleDatas.Count() > maxScalesCount)
-            {
-                var otherRigComponents =
-                    thisRig.gameObject.GetComponents<ScaleRigConstraint>().Where(t => t != thisRig);
-                foreach (var scaleRigConstraint in otherRigComponents)
-                {
-                    Object.Destroy(scaleRigConstraint);
-                }
-            }
+            var customScaleDatas = updatedTransforms.Select(t =>
+                new TransformDataSerialize(t.rig, t.source.localScale, t.source.localPosition));
 
             //Save new rig data
-            var firstScaleData = customScaleDatas.Take(maxScalesCount).ToList();
-            thisRig.data.SetScaleData(firstScaleData);
-
-            //Avoid limits in WeightTransformArray - create multiple scale rig constraints
-            var otherScales = customScaleDatas.Skip(maxScalesCount);
-            var otherScaleDatasCount = customScaleDatas.Count() - maxScalesCount;
-            for (int i = 0; i < otherScaleDatasCount; i += maxScalesCount)
-            {
-                var otherScaleLimit = otherScales.Skip(i).Take(maxScalesCount);
-                var newScaleRig = thisRig.gameObject.AddComponent<ScaleRigConstraint>();
-                newScaleRig.data.SetScaleData(otherScaleLimit.ToList());
-            }
+            thisRig.data.SetScaleData(customScaleDatas);
         }
 
         private IEnumerable<PathTransform> GeneratePathPairsForChildTransforms(Transform parent)

@@ -64,21 +64,14 @@ namespace ScaleRigConstraintAnimation
     [CustomEditor(typeof(ScaleRigConstraint))]
     public class ScaleRigConstraintEditor : Editor
     {
-        private SerializedProperty weightProperty;
-        private SerializedProperty bonesProperty;
-
         private Animator animator;
-
         private BaseScaleRigConstraintEditorAction currentUpdateRigAction;
 
         public ScaleRigConstraint rigConstraint;
 
         public void OnEnable()
         {
-            weightProperty = serializedObject.FindProperty("m_Weight");
             rigConstraint = (ScaleRigConstraint)serializedObject.targetObject;
-            var data = serializedObject.FindProperty("m_Data");
-            bonesProperty = data.FindPropertyRelative(nameof(ScaleRigConstraint.data.bones));
             animator = rigConstraint.gameObject.GetComponentInParent<Animator>();
         }
 
@@ -89,9 +82,7 @@ namespace ScaleRigConstraintAnimation
 
         public override void OnInspectorGUI()
         {
-            serializedObject.Update();
-            EditorGUILayout.PropertyField(weightProperty);
-            EditorGUILayout.PropertyField(bonesProperty);
+            base.OnInspectorGUI();
             DrawButtonsAndExecuteModifications();
             serializedObject.ApplyModifiedProperties();
         }

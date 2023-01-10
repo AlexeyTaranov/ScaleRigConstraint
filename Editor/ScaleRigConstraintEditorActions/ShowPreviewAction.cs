@@ -22,13 +22,13 @@ namespace ScaleRigConstraintAnimation.ScaleRigConstraintEditorActions
         private void ApplyPreview()
         {
             var rigConstraint = ScaleRigEditor.rigConstraint;
-            var bones = rigConstraint.data.bones;
-            var customData = rigConstraint.data.scaleData;
-            for (int i = 0; i < bones.Count; i++)
+            var customData = rigConstraint.data.ScaleData;
+            foreach (var data in customData)
             {
-                var bone = rigConstraint.data.bones[i];
-                bone.transform.localPosition = customData[i].Position;
-                bone.transform.localScale = customData[i].Scale;
+                var transform = data.Transform;
+                var transformData = data.ToTransformData();
+                transform.localPosition = transformData.Position;
+                transform.localScale = transformData.Scale;
             }
         }
     }

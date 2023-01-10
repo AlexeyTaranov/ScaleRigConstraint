@@ -7,13 +7,11 @@ namespace ScaleRigConstraintAnimation
 {
     public struct ScaleRigConstraintJob : IWeightedAnimationJob
     {
-        public NativeArray<ScalePosition> scalePositions;
         public NativeArray<ReadWriteTransformHandle> bones;
 
-        public NativeArray<PropertyStreamHandle> readWeightHandles;
-        public NativeArray<float> weightBuffers;
-        public NativeArray<Vector3> defaultLocalScales;
-        public NativeArray<Vector3> defaultLocalPositions;
+        public NativeArray<TransformData> customTransforms;
+        public NativeArray<TransformData> defaultTransforms;
+        
         public FloatProperty jobWeight { get; set; }
 
         public void ProcessAnimation(AnimationStream stream)
@@ -27,23 +25,19 @@ namespace ScaleRigConstraintAnimation
 
         private void Execute(AnimationStream stream)
         {
-            AnimationStreamHandleUtility.ReadFloats(stream, readWeightHandles, weightBuffers);
-            var weightAll = jobWeight.Get(stream);
-            for (int i = 0; i < scalePositions.Length; i++)
+            var weight = jobWeight.Get(stream);
+            for (int i = 0; i < customTransforms.Length; i++)
             {
-                var readHandle = scalePositions[i];
-                var boneHandle = bones[i];
-                var weight = weightBuffers[i] * weightAll;
-                var aScale = defaultLocalScales[i];
-                var bScale = readHandle.Scale;
-                var scale = Vector3.Lerp(aScale, bScale, weight);
-                boneHandle.SetLocalScale(stream, scale);
+                var aScale = defaultTransforms[i].Scale;
+                var bScale = customTransforms[i].Scale;
+                var lScale = Vector3.Lerp(aScale, bScale, weight);
+                bones[i].SetLocalScale(stream, lScale);
 
-                var offset = readHandle.Position - defaultLocalPositions[i];
-                var aPos = boneHandle.GetLocalPosition(stream);
+                var offset = customTransforms[i].Position - defaultTransforms[i].Position;
+                var aPos = bones[i].GetLocalPosition(stream);
                 var bPos = aPos + offset;
                 var lPos = Vector3.Lerp(aPos, bPos, weight);
-                boneHandle.SetLocalPosition(stream, lPos);
+                bones[i].SetLocalPosition(stream, lPos);
             }
         }
     }
@@ -54,35 +48,24 @@ namespace ScaleRigConstraintAnimation
         public override ScaleRigConstraintJob Create(Animator animator, ref ScaleRigConstraintJobData data,
             Component component)
         {
-            WeightedTransformArrayBinder.BindWeights(animator, component, data.bones,
-                ConstraintsUtils.ConstructConstraintDataPropertyName(nameof(ScaleRigConstraintJobData.bones)),
-                out var readWeights);
-            WeightedTransformArrayBinder.BindReadWriteTransforms(animator, component, data.bones,
-                out var boneTransforms);
-            var defaultLocalScales = new NativeArray<Vector3>(data.scaleData.Length, Allocator.Persistent,
-                NativeArrayOptions.UninitializedMemory);
-            var defaultLocalPositions = new NativeArray<Vector3>(data.scaleData.Length, Allocator.Persistent,
-                NativeArrayOptions.UninitializedMemory);
-            var customScalesAndPositions = new NativeArray<ScalePosition>(data.scaleData.Length, Allocator.Persistent,
-                NativeArrayOptions.UninitializedMemory);
-            for (int i = 0; i < data.bones.Count; i++)
+            var count = data.ScaleData.Count;
+            var bones = new NativeArray<ReadWriteTransformHandle>(count, Allocator.Persistent);
+            var defaultTransforms = new NativeArray<TransformData>(count, Allocator.Persistent);
+            var customTransforms = new NativeArray<TransformData>(data.ScaleData.Count, Allocator.Persistent);
+            for (int i = 0; i < data.ScaleData.Count; i++)
             {
-                var transform = data.bones[i].transform;
-                defaultLocalScales[i] = transform.localScale;
-                defaultLocalPositions[i] = transform.localPosition;
-                customScalesAndPositions[i] = data.scaleData[i];
+                var transform = data.ScaleData[i].Transform;
+                defaultTransforms[i] = new TransformData(transform.localScale, transform.localPosition);
+                customTransforms[i] = data.ScaleData[i].ToTransformData();
+                bones[i] = ReadWriteTransformHandle.Bind(animator, transform);
             }
 
             var job = new ScaleRigConstraintJob
             {
-                bones = boneTransforms,
-                readWeightHandles = readWeights,
-                scalePositions = customScalesAndPositions,
-                weightBuffers = new NativeArray<float>(data.bones.Count, Allocator.Persistent,
-                    NativeArrayOptions.UninitializedMemory),
+                bones = bones,
+                customTransforms = customTransforms,
                 jobWeight = FloatProperty.Bind(animator, component, ScaleRigConstraint.WeightPropertyName),
-                defaultLocalPositions = defaultLocalPositions,
-                defaultLocalScales = defaultLocalScales
+                defaultTransforms = defaultTransforms,
             };
             return job;
         }
@@ -90,12 +73,9 @@ namespace ScaleRigConstraintAnimation
 
         public override void Destroy(ScaleRigConstraintJob job)
         {
-            job.scalePositions.Dispose();
+            job.customTransforms.Dispose();
+            job.defaultTransforms.Dispose();
             job.bones.Dispose();
-            job.weightBuffers.Dispose();
-            job.readWeightHandles.Dispose();
-            job.defaultLocalPositions.Dispose();
-            job.defaultLocalScales.Dispose();
         }
     }
 }
